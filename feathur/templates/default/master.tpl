@@ -194,7 +194,7 @@
     <!-- START FOOTER -->
     <div id="footer">
     	<div class="left-column"></div>
-        <div class="right-column">&copy Copyright 2013 <a href="http://feathur.com" target="_blank">Feathur</a> - All rights reserved.</div>
+        <div class="right-column">&copy Copyright 2013 - 2014 <a href="http://feathur.com" target="_blank">Feathur</a> - All rights reserved.</div>
     </div>
     <!-- END FOOTER -->
 </div>
