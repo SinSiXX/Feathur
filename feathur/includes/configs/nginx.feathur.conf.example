@@ -23,6 +23,10 @@ server {
 		include fastcgi_params;
 	}
 	
+	location / {
+		try_files $uri $uri/ /rewrite.php;
+	}
+	
 	location ~\.php$ {
 		include fastcgi_params;
 		fastcgi_intercept_errors off;

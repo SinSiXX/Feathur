@@ -93,7 +93,7 @@ class NewTemplater
 	
 	public function Load($template_name)
 	{
-		global $template_cache;
+		global $template_cache, $cphp_config;
 		
 		if(isset($template_cache[$template_name]))
 		{
@@ -101,7 +101,8 @@ class NewTemplater
 		}
 		else
 		{
-			$this->template = file_get_contents("templates/{$template_name}.tpl");
+			$template_extension = (empty($cphp_config->templates->extension)) ? "tpl" : $cphp_config->templates->extension;
+			$this->template = file_get_contents("templates/{$template_name}.{$template_extension}");
 			$template_cache[$template_name] = $this->template;
 		}
 		
@@ -424,7 +425,7 @@ class NewTemplater
 							/* Apparently a false alarm - there were no matching constructs in the grammar.
 							 * Add the data as a raw data element and continue reading. */
 							$new_el = new TemplateRawData("{%{$buffer}}");
-							$new_el->templater = this;
+							$new_el->templater = $this;
 							$elements[$current_level][] = $new_el;
 						}
 					}
@@ -868,28 +869,28 @@ class TemplateBlockElement extends TemplateElement
 			$left = $this->FetchVariable($left, $data);
 		}
 		
-		if($left == "true")
+		if($left === "true")
 		{
 			$left = true;
 		}
-		elseif($left == "false")
+		elseif($left === "false")
 		{
 			$left = false;
 		}
-		elseif($left == "null")
+		elseif($left === "null")
 		{
 			$left = null;
 		}
 		
-		if($right == "true")
+		if($right === "true")
 		{
 			$right = true;
 		}
-		elseif($right == "false")
+		elseif($right === "false")
 		{
 			$right = false;
 		}
-		elseif($right == "null")
+		elseif($right === "null")
 		{
 			$right = null;
 		}

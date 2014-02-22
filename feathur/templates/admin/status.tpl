@@ -8,7 +8,7 @@
 			}
 			function uptime() {
 					$(function() {
-							$.getJSON("admin.php?json=1",function(result){
+							$.getJSON("/admin?json=1",function(result){
 									$("#Status").html(result.content);
 									counttx=0;
 							});
@@ -39,11 +39,11 @@
 	<br><br>
 	{%if isset|Statistics == true}
 		{%foreach server in Statistics}
-			<div class="simplebox grid360-{%if isempty|server[type] == true}right{%/if}{%if isempty|server[type] == false}left{%/if}" style="padding:3px;padding-bottom:10px;">
+			<div class="simplebox grid36" style="padding:3px;padding-bottom:10px; float: left;">
 				<div class="titleh">
 					<h3>
 						<div style="width:39%;float:left;">
-							<img src="./templates/status/{%if isempty|server[status] == true}offline{%/if}{%if isempty|server[status] == false}online{%/if}.png" style="width:10px;height:10px;">{%if isset|server[name] == true}&nbsp;{%?server[name]}{%/if}
+							<img src="/templates/status/{%if isempty|server[status] == true}offline{%/if}{%if isempty|server[status] == false}online{%/if}.png" style="width:10px;height:10px;">{%if isset|server[name] == true}&nbsp;{%?server[name]}{%/if}
 						</div>
 						{%if isempty|server[status] == false}
 							<div style="width:59%;float:right;padding-right:5px;" align="right">
@@ -81,7 +81,6 @@
 					</div>
 				</div>
 			</div>
-			{%if isempty|server[type] == true}<div class="clear"></div>{%/if}
 		{%/foreach}
 	{%/if}
 	{%if isset|Statistics == false}

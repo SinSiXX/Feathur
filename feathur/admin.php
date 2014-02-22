@@ -19,10 +19,10 @@ if($sUser->sPermissions != 7){
 	die();
 }
 
-if(file_exists('./admin/'.$sView.'.php')) {
-	include('./admin/'.$sView.'.php');
+if(file_exists('./admin2/'.$sView.'.php')) {
+	include('./admin2/'.$sView.'.php');
 } else {
-	include("./admin/dashboard.php");
+	include("./admin2/dashboard.php");
 }
 
 echo Templater::AdvancedParse($sTemplate->sValue.'/master', $locale->strings, array("Content" => $sContent, "Page" => $sPage, "PageType" => $sPageType, "Errors" => $sErrors));

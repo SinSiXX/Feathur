@@ -46,6 +46,9 @@ class VPS extends CPHPDatabaseRecordClass {
 			'LastBandwidth' => "last_bandwidth",
 			'IPv6' => "ipv6",
 		),
+		"user" => array(
+			"User" => "user_id"
+		)
 	);
 	
 	public static function localhost_connect(){
