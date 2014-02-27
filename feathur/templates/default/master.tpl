@@ -155,7 +155,7 @@
 									</a>
 									<ul class="submenu" id="users">
 										<li{%if Page == listusers} class="active"{%/if}>
-											<a href="admin.php?view=list&type=users">
+											<a href="/admin/users">
 												<img src="/templates/default/img/icons/sidemenu/user.png" width="16" height="16" alt="icon"/>
 												List Users
 											</a>
@@ -176,7 +176,7 @@
 									</a>
 									<ul class="submenu" id="vps">
 										<li{%if Page == listvps} class="active"{%/if}>
-											<a href="admin.php?view=list&type=vps">
+											<a href="/admin/vps">
 												<img src="/templates/default/img/icons/sidemenu/info.png" width="16" height="16" alt="icon"/>
 												List VPS
 											</a>
@@ -197,7 +197,7 @@
 									</a>
 									<ul class="submenu" id="servers">
 										<li{%if Page == listservers} class="active"{%/if}>
-											<a href="admin.php?view=list&type=servers">
+											<a href="/admin/servers">
 												<img src="/templates/default/img/icons/sidemenu/laptop.png" width="16" height="16" alt="icon"/>
 												List Servers
 											</a>

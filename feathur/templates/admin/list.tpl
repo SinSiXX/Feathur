@@ -87,7 +87,7 @@
 						<tr>
 							<td><a href="admin.php?view=clients&id={%?entry[id]}">{%?entry[username]}</a></td>
 							<td><div align="center">{%?entry[email_address]}</div></td>
-							<td><div align="center"><a href="admin.php?view=list&type=search&search=user={%?entry[id]}">Client VPS</a></div></td>
+							<td><div align="center"><a href="/admin/users/{%?entry[id]}/vps">Client VPS</a></div></td>
 						</tr>
 					{%/foreach}
 				</table>
@@ -111,7 +111,7 @@
 					</thead>
 					{%foreach entry in servers}
 						<tr>
-							<td><a href="admin.php?view=list&type=search&search=server={%?entry[id]}">{%?entry[name]}</a></td>
+							<td><a href="/admin/servers/{%?entry[id]}/vps">{%?entry[name]}</a></td>
 							<td><div align="center">{%?entry[ip_address]}</div></td>
 							<td><div align="center">{%?entry[type]}</div></td>
 						</tr>
