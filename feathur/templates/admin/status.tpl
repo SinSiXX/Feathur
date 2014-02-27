@@ -9,7 +9,7 @@
 			function uptime() {
 					$(function() {
 							$.getJSON("/admin?json=1",function(result){
-									$("#Status").html(result.content);
+									//$("#Status").html(result.content);
 									counttx=0;
 							});
 					});
@@ -39,7 +39,7 @@
 	<br><br>
 	{%if isset|Statistics == true}
 		{%foreach server in Statistics}
-			<div class="simplebox grid36" style="padding:3px;padding-bottom:10px; float: left;">
+			<div class="simplebox grid36 server-status">
 				<div class="titleh">
 					<h3>
 						<div style="width:39%;float:left;">
