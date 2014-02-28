@@ -32,6 +32,8 @@ class Core {
 			if((!empty($sSendGridUser)) && (!empty($sSendGridPass))){
 				$sGrid = new SendGrid($sSendGridUser, $sSendGridPass);
 				$sMail = new SendGrid\Mail();
+				/* TODO: Check whether below Panel URL value is correct; if it
+				 * includes the port number, that might break the sender! */
 				$sMail->addTo($sTo)->setFrom("noreply@{$sPanelURL->sValue}")->setSubject($sSubject)->setHtml($sEmail);
 				$sGrid->web->send($sMail);
 				return true;

@@ -43,12 +43,27 @@ if($sUser->sPermissions == 7){
 			$sActionUser = new User($sCheckUsers->data[0]["id"]);
 			$sRequested["POST"]["user"] = $sActionUser->sId;
 		} else {
-			$sActionUser = User::generate_user($_POST['useremail'], $_POST['username'], 1);
-			if(is_array($sActionUser)){
-				echo json_encode($sActionUser);
-				die();
+			/* This just uses the (refactored) panel implementation, and wraps it. */
+			$uApiData = array(
+				"username" => $_POST["username"],
+				"email" => $_POST["useremail"]
+			);
+			
+			$sPageContents = "";
+			$sJsonVariables = array();
+			
+			require("modules/admin/users/add.php");
+			
+			if(!empty($sJsonVariables["user_id"]))
+			{
+				/* Successful */
+				$sRequested["POST"]["user"] = $sCreatedUser->sId;
 			}
-			$sRequested["POST"]["user"] = $sActionUser->sId;
+			else
+			{
+				/* Failure */
+				die(json_encode(array("result" => $sPageContents)));
+			}
 		}
 		
 		// Get template info.

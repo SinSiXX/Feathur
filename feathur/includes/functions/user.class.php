@@ -82,37 +82,6 @@ class User extends CPHPDatabaseRecordClass {
 		}
 	}
 	
-	public static function generate_user($uEmail, $uUsername, $sAPI = NULL){
-		global $database;
-		if(!$result = $database->CachedQuery("SELECT * FROM accounts WHERE `email_address` = :EmailAddress", array('EmailAddress' => $uEmail))){
-			$uEmail = str_replace(" ", "+", $uEmail);
-			if(filter_var($uEmail, FILTER_VALIDATE_EMAIL)){
-				$sActivationCode = random_string(120);
-				$sUser = new User(0);
-				$sUser->uUsername = $uUsername;
-				$sUser->uEmailAddress = $uEmail;
-				$sUser->uPassword = "-1";
-				$sUser->uActivationCode = $sActivationCode;
-				$sUser->InsertIntoDatabase();
-				$sVariable = array("email" => urlencode($sUser->sEmailAddress), "activation_code" => urlencode($sActivationCode));
-				$sSend = Core::SendEmail($sUser->sEmailAddress, "Feathur Activation Email", "new_user", $sVariable);
-				if($sSend === true){
-					if(empty($sAPI)){
-						return $sReturn = array("content" => "Account Created", "created" => "1");
-					} else {
-						return $sUser;
-					}
-				} else {
-					return $sSend;
-				}
-			} else {
-				return $sReturn = array("content" => "The email you entered is invalid.");
-			}
-		} else {
-			return $sReturn = array("content" => "The email you entered already has an account!");
-		}
-	}
-	
 	public static function hash_password($sPassword, $sSalt){
 		$sHash = crypt($sPassword, "$5\$rounds=50000\${$sSalt}$");
 		$sParts = explode("$", $sHash);

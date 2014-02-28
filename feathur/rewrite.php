@@ -25,6 +25,7 @@ $sPageTitle = "";
 $sPageContents = "";
 $sPageCurrent = "about";
 $sPageErrors = array();
+$sJsonVariables = array(); /* You can set items in here, to pass them on in the final JSON, that is returned for a JSON call. */
 
 $router = new CPHPRouter();
 
@@ -396,10 +397,10 @@ $router->RouteRequest();
 if(!empty($router->uVariables["ajax"]))
 {
 	/* Asynchronous request, return as JSON */
-	echo(json_encode(array(
+	echo(json_encode(array_merge(array(
 		"content" => $sPageContents,
 		"title" => $sPageTitle
-	)));
+	), $sJsonVariables)));
 }
 else
 {

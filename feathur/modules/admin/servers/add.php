@@ -36,7 +36,7 @@ if($router->uMethod == "post")
 			->RequireNonEmpty("type")
 			->RequireNonEmpty("location")
 			->ValidateCustom("volume_group", "KVM servers must have a volume group.", function($key, $value, $args, $handler) {
-				return (!empty($value) || (!empty($handler->formdata["type"]) && $handler->formdata["type"] !== "kvm"));
+				return (!empty($value) || (!empty($handler->GetValue("type")) && $handler->GetValue("type") !== "kvm"));
 			})
 			->Done();
 	}

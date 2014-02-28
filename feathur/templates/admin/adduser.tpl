@@ -7,7 +7,7 @@
 			var email = $("#Email").attr('value');
 			$.ajax({
 				type: "POST",
-				url: "admin.php?view=adduser&action=submituser",
+				url: "/admin/users/add",
 				data: "email=" + email + "&username=" + username,
 				success: function(data){
 					var result = $.parseJSON(data);
@@ -29,7 +29,7 @@
 	<div style="z-index: 670;width:50%;" class="albox succesbox" id="AddUserStatusNotice">
 		<div id="AddUserStatus"></div>
 	</div>
-	<div align="center" id="AddUserLoadingImage"><img src="templates/default/img/loading/2.gif"></div>
+	<div align="center" id="AddUserLoadingImage"><img src="/templates/default/img/loading/2.gif"></div>
 	<br><br>
 </div>
 <div align="center">Feathur will email each added user with a unique one-time link to set their password.</div>
