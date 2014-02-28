@@ -140,7 +140,7 @@
 									</a>
 									<ul class="submenu" id="admin">
 										<li{%if Page == dashboard} class="active"{%/if}>
-											<a href="admin.php">
+											<a href="/admin">
 												<img src="/templates/default/img/icons/sidemenu/file.png" width="16" height="16" alt="icon"/>
 												Dashboard
 											</a>
