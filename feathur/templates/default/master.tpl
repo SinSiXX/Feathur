@@ -203,7 +203,7 @@
 											</a>
 										</li>
 										<li{%if Page == addserver} class="active"{%/if}>
-											<a href="admin.php?view=addserver">
+											<a href="/admin/servers/add">
 												<img src="/templates/default/img/icons/sidemenu/laptop.png" width="16" height="16" alt="icon"/>
 												Add Server
 											</a>
@@ -244,7 +244,7 @@
 									</ul>
 								</li>
 								<li>
-									<a href="./phpmyadmin/" target="_blank">
+									<a href="/phpmyadmin" target="_blank">
 										<img src="/templates/default/img/icons/sidemenu/pma.png" width="16" height="16" alt="icon"/>
 										PHPMyAdmin
 									</a>
