@@ -69,31 +69,68 @@ class Server extends CPHPDatabaseRecordClass {
 		),
 	);
 	
-	public static function server_connect($sServer, $sAPI = 0){
-		$sSSH = new Net_SSH2($sServer->sIPAddress);
+	public function Connect($sAPI = 0)
+	{
+		/* TODO: Needs clean-up. */
+		$sSSH = new Net_SSH2($this->sIPAddress);
 		
-		if($sServer->sPassword == 0){
+		if($this->sPassword == 0){
 			$sKey = new Crypt_RSA();
-			$sKey->loadKey(file_get_contents('/var/feathur/data/keys/'.$sServer->sKey));
+			$sKey->loadKey(file_get_contents('/var/feathur/data/keys/'.$this->sKey));
 		} else {
-			$sKey = file_get_contents('/var/feathur/data/keys'.$sServer->sKey);
+			$sKey = file_get_contents('/var/feathur/data/keys'.$this->sKey);
 		}
 		try {
-			if (!$sSSH->login($sServer->sUser, $sKey)) {
-				if(!empty($sAPI)){
-					return $sResult = array("result" => 'Unable to connect to the host node, please contact customer serivce.');
-				}
-				echo json_encode(array("result" => 'Unable to connect to the host node, please contact customer serivce.'));
-				die();
+			if (!$sSSH->login($this->sUser, $sKey)) {
+				throw new ConnectionException("Unable to connect to the host node, please contact customer serivce.");
 			} else {
 				$sSSH->setTimeout(30);
 				return $sSSH;
 			}
 		} catch (Exception $e) { 
-			if(!empty($sAPI)){
-				return $sResult = array("result" => 'Unable to connect to the host node, please contact customer serivce.');
+			throw new ConnectionException("Unable to connect to the host node, please contact customer serivce.");
+		}
+	}
+	
+	public function RequireIPs($amount)
+	{
+		$total_available = 0;
+		
+		try {
+			$sBlocks = Block::CreateFromQuery("SELECT * FROM server_blocks WHERE `server_id` = :ServerId AND `ipv6` = 0", array("ServerId" => $this->sId));
+		} catch (NotFoundException $e) { throw new IpSpaceException("The selected server does not have any IP blocks assigned."); }
+		
+		foreach($sBlocks as $sBlock)
+		{
+			try {
+				$sIpAddresses = IP::CreateFromQuery("SELECT * FROM ipaddresses WHERE `block_id` = :BlockId AND `vps_id` = 0", array("BlockId" => $sBlock->sId));
+			} catch (NotFoundException $e) { continue; /* 0 available in this block, move on to next block. */ }
+			
+			$total_available += count($sIpAddresses);
+		}
+		
+		if($total_available < $amount)
+		{
+			throw new IpSpaceException("There are not enough IP addresses available on the selected server.");
+		}
+	}
+	
+	/* Deprecated methods below... */
+	
+	public static function server_connect($sServer, $sAPI = 0){
+		/* DEPRECATED, only for compatibility. TODO: Log deprecation warning when used. */
+		try
+		{
+			$sServer->Connect($sAPI);
+		}
+		catch (ConnectionException $e)
+		{
+			if(!empty($sAPI))
+			{
+				return array("result" => $e->getMessage());
 			}
-			echo json_encode(array("result" => 'Unable to connect to the host node, please contact customer serivce.'));
+			
+			echo(json_encode($e->getMessage()));
 			die();
 		}
 	}

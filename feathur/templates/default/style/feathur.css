@@ -5,3 +5,8 @@
 	width: 50%;
 	padding: 7px 6px;
 }
+
+form .openvz, form .kvm
+{
+	display: none;
+}

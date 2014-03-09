@@ -149,22 +149,13 @@ class VPS extends CPHPDatabaseRecordClass {
 		return $sUserVPSList;
 	}
 	
-	public static function check_ipspace($sServer, $sMinimum){
-		global $database;
-		$sBlocks = $database->CachedQuery("SELECT * FROM server_blocks WHERE `server_id` = :ServerId AND `ipv6` = 0", array('ServerId' => $sServer));
-		if(!empty($sBlocks)){
-			foreach($sBlocks->data as $key => $value){
-				$sIPs = $database->CachedQuery("SELECT * FROM ipaddresses WHERE `block_id` = :BlockId AND `vps_id` = 0", array('BlockId' => $value["block_id"]));
-				$sTotal = count($sIPs->data);
-			}
-			if($sTotal >= $sMinimum){
-				return true;
-			} else {
-				return $sArray = array("json" => 1, "type" => "caution", "result" => "There are not enough IPs for this VPS!");
-			}
-		} else {
-			return $sArray = array("json" => 1, "type" => "caution", "result" => "There are no blocks assigned to the selected server!");
-		}
+	public static function check_ipspace($uServerId, $uMinimum){
+		/* DEPRECATED, only here for compatibility. Use Server->RequireIPs() instead. TODO: Log deprecation warning when used. */
+		try {
+			$sServer = new Server($uServerId);
+			$sServer->RequireIPs($uMinimum);
+			return true;
+		} catch (IpSpaceException $e) { return array("json" => 1, "type" => "caution", "result" => $e->getMessage()); }
 	}
 	
 	public static function add_template($sLocalSSH, $uName, $uURL, $uType){
@@ -177,7 +168,7 @@ class VPS extends CPHPDatabaseRecordClass {
 			} elseif($uType == 'kvm'){
 				$sList = ".iso";
 			}
-			$sName = preg_replace("/[^a-z0-9._-\s]+/i", "", $uName);
+			$sName = preg_replace("/[^a-z0-9._-\s]+/i", "", $uName); /* FIXME: This doesn't seem right... */
 			$sPath = str_replace($sList, "", basename($uURL));
 			if($sExists = $database->CachedQuery("SELECT * FROM templates WHERE `path` LIKE :TemplatePath && `type` = :Type", array('TemplatePath' => "%".$sPath."%", 'Type' => $uType))){
 				$sPath .= random_string(6);

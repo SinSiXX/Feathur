@@ -108,3 +108,7 @@ function check_updates(){
 		return array("your_version" => $sCurrentVersion, "current_version" => $sVersion, "update" => "0");
 	}
 }
+
+class VpsCreationException extends Exception { }
+class IpSpaceException extends Exception { }
+class ConnectionException extends Exception { }

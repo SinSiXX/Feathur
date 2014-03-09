@@ -2,8 +2,15 @@
 /*
  * Copyright (c) 2013-2014 Feathur Developers
  * 
- * This file is part of Feathur, a VPS control panel.
+ * This file is part of Feathur, a VPS control panel. 
  * 
+ * If you intend on selling VPS from Feathur it is highly recommended that you 
+ * purchase a license. Purchasing a license or donating via our site helps pay
+ * for Feathur's development including new features and support costs.
+ *
+ * Website: http://feathur.com
+ * IRC: irc.obsidianirc.net / 6667 - #feathur
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or

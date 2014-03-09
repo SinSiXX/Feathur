@@ -161,7 +161,7 @@
 											</a>
 										</li>
 										<li{%if Page == adduser} class="active"{%/if}>
-											<a href="admin.php?view=adduser">
+											<a href="/admin/users/add">
 												<img src="/templates/default/img/icons/sidemenu/user_add.png" width="16" height="16" alt="icon"/>
 												Create User
 											</a>
