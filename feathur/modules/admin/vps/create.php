@@ -27,6 +27,67 @@
 
 if(!isset($_APP)) { die("Unauthorized."); }
 
+/* FIXME: The below are validation functions that are used further
+ * in this file. They should really be moved to an include instead. */
+
+function ValidateSelected($key, $value, $args, $handler) {
+	return (!empty($value) && $value !== "z" && is_numeric($value));
+}
+
+function ValidateUser($key, $value, $args, $handler){
+	global $sOwner;
+	try
+	{
+		$sOwner = new User($value);
+		return true;
+	}
+	catch (NotFoundException $e)
+	{
+		return false;
+	}
+}
+
+function ValidateServer($key, $value, $args, $handler){
+	global $sServer;
+	try
+	{
+		$sServer = new Server($value);
+		return true;
+	}
+	catch (NotFoundException $e)
+	{
+		return false;
+	}
+}
+
+function ValidateOpenvzTemplate($key, $value, $args, $handler){
+	global $sTemplate;
+	try
+	{
+		$sTemplate = new Template($value);
+		return ($sTemplate->sType === "openvz"); /* Only allow selection of OpenVZ templates */
+	}
+	catch (NotFoundException $e)
+	{
+		return false;
+	}
+}
+
+function ValidateKvmTemplate($key, $value, $args, $handler){
+	global $sTemplate;
+	try
+	{
+		$sTemplate = new Template($value);
+		return ($sTemplate->sType === "kvm"); /* Only allow selection of KVM templates */
+	}
+	catch (NotFoundException $e)
+	{
+		return false;
+	}
+}
+
+/* Actual module code starts here. */
+
 if($router->uMethod == "post")
 {
 	$router->uVariables["ajax"] = true; /* POST requests to this module always result in an AJAX response. */
@@ -53,37 +114,11 @@ if($router->uMethod == "post")
 		$handler = new CPHPFormHandler($uDataSource);
 		
 		$handler
-			->ValidateCustom("user", "You must select a user.", function($key, $value, $args, $handler) {
-				return (!empty($value) && $value !== "z" && is_numeric($value));
-			})
-			->ValidateCustom("server", "You must select a server.", function($key, $value, $args, $handler) {
-				return (!empty($value) && $value !== "z" && is_numeric($value));
-			})
+			->ValidateCustom("user", "You must select a user.", "ValidateSelected")
+			->ValidateCustom("server", "You must select a server.", "ValidateSelected")
 			->AbortIfErrors()
-			->ValidateCustom("user", "The specified user does not exist.", function($key, $value, $args, $handler){
-				global $sOwner;
-				try
-				{
-					$sOwner = new User($value);
-					return true;
-				}
-				catch (NotFoundException $e)
-				{
-					return false;
-				}
-			})
-			->ValidateCustom("server", "The specified server does not exist.", function($key, $value, $args, $handler){
-				global $sServer;
-				try
-				{
-					$sServer = new Server($value);
-					return true;
-				}
-				catch (NotFoundException $e)
-				{
-					return false;
-				}
-			})
+			->ValidateCustom("user", "The specified user does not exist.", "ValidateUser")
+			->ValidateCustom("server", "The specified server does not exist.", "ValidateServer")
 			->Done();
 	}
 	catch (FormValidationException $e)
@@ -109,9 +144,7 @@ if($router->uMethod == "post")
 				->Switch_("virt_type", "",  /* TODO: Filter out empty error messages */
 					/* Either OpenVZ options must be filled in... */
 					$handler->Case_("openvz",
-						$handler->ValidateCustom("openvz_template", "You must select a valid template.", function($key, $value, $args, $handler) {
-							return (!empty($value) && $value !== "z" && is_numeric($value));
-						}),
+						$handler->ValidateCustom("openvz_template", "You must select a valid template.", "ValidateSelected"),
 						$handler->ValidateNumeric("openvz_cpulimit"),
 						$handler->ValidateNumeric("swap"), /* TODO: Validate format, allow MB etc. suffixes */
 						$handler->ValidateNumeric("cpuunits"),
@@ -120,38 +153,14 @@ if($router->uMethod == "post")
 						$handler->ValidateNumeric("numiptent"),
 						/* The rest is optional. */
 						$handler->AbortIfErrors(),
-						$handler->ValidateCustom("openvz_template", "The specified template is not a valid OpenVZ template.", function($key, $value, $args, $handler){
-							global $sTemplate;
-							try
-							{
-								$sTemplate = new Template($value);
-								return ($sTemplate->sType === "openvz"); /* Only allow selection of OpenVZ templates */
-							}
-							catch (NotFoundException $e)
-							{
-								return false;
-							}
-						})
+						$handler->ValidateCustom("openvz_template", "The specified template is not a valid OpenVZ template.", "ValidateOpenvzTemplate")
 					),
 					/* ... or KVM options must be. */
 					$handler->Case_("kvm",
-						$handler->ValidateCustom("kvm_template", "You must select a valid template.", function($key, $value, $args, $handler) {
-							return (!empty($value) && $value !== "z" && is_numeric($value));
-						}),
+						$handler->ValidateCustom("kvm_template", "You must select a valid template.", "ValidateSelected"),
 						$handler->ValidateNumeric("kvm_cpulimit"),
 						$handler->AbortIfErrors(),
-						$handler->ValidateCustom("kvm_template", "The specified template is not a valid OpenVZ template.", function($key, $value, $args, $handler){
-							global $sTemplate;
-							try
-							{
-								$sTemplate = new Template($value);
-								return ($sTemplate->sType === "kvm"); /* Only allow selection of KVM templates */
-							}
-							catch (NotFoundException $e)
-							{
-								return false;
-							}
-						})
+						$handler->ValidateCustom("kvm_template", "The specified template is not a valid KVM template.", "ValidateKvmTemplate") /* Is this supposed to be required for KVM? */
 					)
 				)
 				->Done();
@@ -206,9 +215,6 @@ if($router->uMethod == "post")
 				throw new VpsCreationException($e->getMessage());
 			}
 			
-			$uHostname = $handler->GetValue("hostname", "vps.example.com");
-			$uNameserver = $handler->GetValue("nameserver", "8.8.8.8");
-			
 			$sVPS = new VPS();
 			$sVPS->uType = $handler->GetValue("virt_type");
 			$sVPS->uHostname = $uHostname;
@@ -218,20 +224,64 @@ if($router->uMethod == "post")
 			$sVPS->uDisk = $handler->GetValue("disk");
 			$sVPS->uTemplateId = $sTemplate->sId;
 			$sVPS->uBandwidthLimit = $handler->GetValue("bandwidthlimit");
+			$sVPS->uNameserver = $handler->GetValue("nameserver", "8.8.8.8");
+			$sVPS->uHostname = $handler->GetValue("hostname", "vps.example.com");
 			
-			/* Virtualization-specific code... TODO: Move these back to a driver? */
+			$sSetting = Core::GetSetting("container_id");
+			$sContainerId = $sSetting->sValue;
+			
+			/* Update the CTID for the next VPS...
+			 * TODO: Possible race condition! */
+			$sSetting->uValue = $sSetting->sValue + 1;
+			$sSetting->InsertIntoDatabase();
+			
+			$sVPS->uContainerId = $sContainerId;
+			
+			$sAssignedIps = array();
+			$desired_ips = $handler->GetValue("ipaddresses");
+			
+			if($desired_ips > 0)
+			{
+				$total_assigned = 0;
+				
+				try {
+					$sBlocks = Block::CreateFromQuery("SELECT * FROM server_blocks WHERE `server_id` = :ServerId AND `ipv6` = 0", array("ServerId" => $sServer->sId), 0);
+				} catch (NotFoundException $e) { throw new VpsCreationException("No IPv4 blocks are available for the selected server."); }
+				
+				foreach($sBlocks as $sBlock)
+				{
+					try {
+						$sIpAddresses = IP::CreateFromQuery("SELECT * FROM ipaddresses WHERE `block_id` = :BlockID and `vps_id` = 0", array("BlockId" => $sBlock->sId));
+					} catch (NotFoundException $e) { continue; /* Ignore this block, move on to the next block. */ }
+					
+					foreach($sIpAddresses as $sIpAddress)
+					{
+						if($total_assigned < $desired_ips)
+						{
+							$sIpAddress->uVPSId = $sVPS->sId;
+							$sIpAddress->InsertIntoDatabase();
+							$sAssignedIps[] = $sIpAddress; /* Add to the 'assigned' list, for later use in vzctl commands. */
+							
+							if($total_assigned == 0)
+							{
+								/* This is the first IP to be assigned, thus the primary IP. */
+								$sVPS->uPrimaryIP = $sIpAddress->sIPAddress;
+							}
+							
+							$total_assigned += 1;
+						}
+					}
+				}
+				
+				if($total_assigned < $desired_ips)
+				{
+					/* FIXME: Log a warning! */
+				}
+			}
+			
 			switch($handler->GetValue("virt_type"))
 			{
 				case "openvz":
-					$sSetting = Core::GetSetting("container_id");
-					$sContainerId = $sSetting->sValue;
-					
-					/* Update the CTID for the next VPS...
-					 * TODO: Possible race condition! */
-					$sSetting->uValue = $sSetting->sValue + 1;
-					$sSetting->InsertIntoDatabase();
-					
-					$sVPS->uContainerId = $sContainerId;
 					$sVPS->uNumIPTent = $handler->GetValue("numiptent");
 					$sVPS->uNumProc = $handler->GetValue("numproc");
 					$sVPS->uSWAP = $handler->GetValue("swap");
@@ -239,53 +289,89 @@ if($router->uMethod == "post")
 					$sVPS->uCPULimit = $handler->GetValue("openvz_cpulimit");
 					$sVPS->InsertIntoDatabase();
 					
-					$sAssignedIps = array();
-					$desired_ips = $handler->GetValue("ipaddresses");
+					/* The creation code is moved here for now. It should eventually be back
+					 * into the "driver" (openvz) class, but as I don't have a full oversight of
+					 * the security implications of removing the authentication code there,
+					 * I am placing it here instead - that way I can be certain that this code
+					 * cannot be invoked without the sufficient authentication.
+					 * TODO: Move this code back to driver class as a member function. */
+					$sSSH = $sVPS->sServer->Connect();
+					$sPassword = $handler->GetValue("root_password");
+					$sDiskLimit = $sVPS->sDisk + 1;  /* NOTE: This is in GB. If a unit change were to happen, it needs to be changed. */
+					$sCPUs = round($sVPS->sCPULimit / 100);
 					
-					if($desired_ips > 0)
+					$sCommands = array(
+						"vzctl create {$sVPS->sContainerId} --ostemplate {$sVPS->sTemplate->sPath}",
+						"vzctl set {$sVPS->sContainerId} --onboot yes --save",
+						"vzctl set {$sVPS->sContainerId} --ram {$sVPS->sRAM}M --swap {$sVPS->sSWAP}M --save",
+						"vzctl set {$sVPS->sContainerId} --cpuunits {$sVPS->sCPUUnits} --save",
+						"vzctl set {$sVPS->sContainerId} --cpulimit {$sVPS->sCPULimit} --save",
+						"vzctl set {$sVPS->sContainerId} --cpus {$sCPUs} --save",
+						"vzctl set {$sVPS->sContainerId} --diskspace {$sVPS->sDisk}G:{$sHighDisk}G --save",
+						"vzctl start {$sVPS->sContainerId}",
+						"vzctl set {$sVPS->sContainerId} --nameserver {$sVPS->sNameserver} --save",
+						"vzctl set {$sVPS->sContainerId} --hostname {$sVPS->sHostname} --save",
+						"modprobe tun;vzctl set {$sVPS->sContainerId} --devnodes net/tun:rw --save;vzctl set {$sVPS->sContainerId} --devices c:10:200:rw --save;vzctl set {$sVPS->sContainerId} --capability net_admin:on --save;vzctl exec {$sVPS->sContainerId} mkdir -p /dev/net;vzctl exec {$sVPS->sContainerId} mknod /dev/net/tun c 10 200",
+						"modprobe iptables_module ipt_helper ipt_REDIRECT ipt_TCPMSS ipt_LOG ipt_TOS iptable_nat ipt_MASQUERADE ipt_multiport xt_multiport ipt_state xt_state ipt_limit xt_limit ipt_recent xt_connlimit ipt_owner xt_owner iptable_nat ipt_DNAT iptable_nat ipt_REDIRECT ipt_length ipt_tcpmss iptable_mangle ipt_tos iptable_filter ipt_helper ipt_tos ipt_ttl ipt_SAME ipt_REJECT ipt_helper ipt_owner ip_tables",
+						"vzctl set {$sVPS->sContainerId} --iptables ipt_REJECT --iptables ipt_tos --iptables ipt_TOS --iptables ipt_LOG --iptables ip_conntrack --iptables ipt_limit --iptables ipt_multiport --iptables iptable_filter --iptables iptable_mangle --iptables ipt_TCPMSS --iptables ipt_tcpmss --iptables ipt_ttl --iptables ipt_length --iptables ipt_state --iptables iptable_nat --iptables ip_nat_ftp --save"
+					);
+					
+					if(!empty($sPassword))
 					{
-						$total_assigned = 0;
-						
-						try {
-							$sBlocks = Block::CreateFromQuery("SELECT * FROM server_blocks WHERE `server_id` = :ServerId AND `ipv6` = 0", array("ServerId" => $sServer->sId), 0);
-						} catch (NotFoundException $e) { throw new VpsCreationException("No IPv4 blocks are available for the selected server."); }
-						
-						foreach($sBlocks as $sBlock)
+						$sCommands[] = "vzctl set {$sVPS->sContainerId} --userpasswd root:{$sPassword} --save";
+					}
+					
+					if(!empty($sAssignedIps))
+					{
+						foreach($sAssignedIps as $sIp)
 						{
-							try {
-								$sIpAddresses = IP::CreateFromQuery("SELECT * FROM ipaddresses WHERE `block_id` = :BlockID and `vps_id` = 0", array("BlockId" => $sBlock->sId));
-							} catch (NotFoundException $e) { continue; /* Ignore this block, move on to the next block. */ }
-							
-							foreach($sIpAddresses as $sIpAddress)
-							{
-								if($total_assigned < $desired_ips)
-								{
-									$sIpAddress->uVPSId = $sVPS->sId;
-									$sIpAddress->InsertIntoDatabase();
-									$sAssignedIps[] = $sIpAddress; /* Add to the 'assigned' list, for later use in vzctl commands. */
-									
-									if($total_assigned == 0)
-									{
-										/* This is the first IP to be assigned, thus the primary IP. */
-										$sVPS->uPrimaryIP = $sIpAddress->sIPAddress;
-										$sVPS->InsertIntoDatabase();
-									}
-									
-									$total_assigned += 1;
-								}
-							}
-						}
-						
-						if($total_assigned < $desired_ips)
-						{
-							/* FIXME: Log a warning! */
+							$sCommands[] = "vzctl set {$sVPS->sContainerId} --ipadd {$sIp->sIPAddress} --save";
 						}
 					}
 					
-					/* TODO: Actual creation. */
+					$sCommands[] = "vzctl stop {$sVPS->sContainerId}";
+					$sCommands[] = "vzctl start {$sVPS->sContainerId}";
+					
+					/* This combines all commands into a single command string, delimited by semicolons. */
+					$sCommandString = implode("; ", $sCommands);
+					
+					$sResult = $sSSH->exec($sCommandString);
+					
+					VPS::save_vps_logs(array(
+						"command" => str_replace($sPassword, "<obfuscated>", $sCommandString),
+						"result" => $sResult
+					), $sVPS);
+					
+					$sPageContents = ""; /* Not used on this page */
+					$sJsonVariables["type"] = "success";
+					$sJsonVariables["result"] = "VPS has been created.";
+					$sJsonVariables["reload"] = 1;
+					$sJsonVariables["vps"] = $sVPS->sId;
 					break;
 				case "kvm":
-					break; /* TODO: KVM implementation... */
+					$sMacAddresses = array();
+					for($i = 0; $i <= $handler->GetValue("ip_addresses"); $i++)
+					{
+						$sMacAddresses[] = generate_mac();
+					}
+					
+					$sVPS->uMac = implode(",", $sMacAddresses); /* Comma-delimited list of MACs */
+					$sVPS->uCPULimit = $handler->GetValue("kvm_cpulimit");
+					$sVPS->uVNCPort = ($sVPS->uContainerId + 5900);
+					$sVPS->uBootOrder = "hd";
+					$sVPS->InsertIntoDatabase();
+					
+					/* Create the VM */
+					$sSSH = $sVPS->sServer->Connect();
+					
+					/* TODO: Finish this stuff... */
+					//$sCreate = $this->kvm_config($sUser, $sVPS, $sRequested);
+					//$sDHCP = $this->kvm_dhcp($sUser, $sVPS, $sRequested);
+					
+					//$sCommandList .= "lvcreate -n kvm{$sVPS->sContainerId}_img -L {$sVPS->sDisk}G {$sServer->sVolumeGroup};virsh create /var/feathur/configs/kvm{$sVPS->sContainerId}-vps.xml;virsh autostart kvm{$sVPS->sContainerId}";
+					//$sLog[] = array("command" => $sCommandList, "result" => $sSSH->exec($sCommandList));
+					//$sSave = VPS::save_vps_logs($sLog, $sVPS);
+					break;
 			}
 		}
 		catch (VpsCreationException $e)
@@ -293,27 +379,6 @@ if($router->uMethod == "post")
 			/* FIXME: Log these! */
 			$sErrors = array($e->getMessage);
 		}
-		
-		/*
-		$sDatabaseMethodName = "database_{$sServer->sType}_create";
-		$sMainMethodName = "{$sServer->sType}_create";
-		$sCreate = $sServerType->$sMethod($sUser, $sRequested);
-		if(is_array($sCreate)){
-			echo json_encode($sCreate);
-			die();
-		}
-		$sFinish = $sServerType->$sSecond($sUser, $sRequested);
-		if(is_array($sFinish)){
-			echo json_encode($sFinish);
-			die();
-		}
-		*/
-		
-		
-		
-		$sPageContents = ""; /* Not used on this page */
-		$sJsonVariables["type"] = "success";
-		$sJsonVariables["result"] = "VPS created.";
 	}
 	
 	if(!empty($sErrors))

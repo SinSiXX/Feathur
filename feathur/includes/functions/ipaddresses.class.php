@@ -14,6 +14,9 @@ class IP extends CPHPDatabaseRecordClass {
 		'numeric' => array(
 			'VPSId' => "vps_id",
 			'BlockId' => "block_id",
+		),
+		"block" => array(
+			"Block" => "block_id"
 		)
 	);
 }

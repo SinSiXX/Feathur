@@ -152,7 +152,7 @@ class openvz {
 			return $sArray = array("json" => 1, "type" => "error", "result" => "Permissions invalid for selected action.");
 		}
 	}		
-														
+								
 	public function openvz_create($sUser, $sRequested){
 		$sUserPermissions = $sUser->sPermissions;
 		if($sUserPermissions == 7){

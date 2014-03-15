@@ -314,121 +314,194 @@ class kvm {
 		return $sArray = array("json" => 1, "type" => "success", "result" => "{$sTemplate->sName} has been mounted!");
 	}
 	
+	public function configure($sVPS, $sAssignedIps, $sDiskChanged = false, $sPassword = "")
+	{
+		/* TODO: Make sure suspension check is in the module code! */
+		/* FIXME: This should be proper XML generation, not just string concatenation. */
+		$sSSH = $sVPS->sServer->Connect();
+		$sMemory = ($sVPS->sRAM * 1024);
+		$sMemoryLimit = ($sMemory + 51200); /* ? */
+		$sCPUs = $sVPS->sCPULimit;
+		
+		$sCommands = array();
+		
+		/* Configure (virtual) devices */
+		
+		if(!empty($sVPS->sServer->sQEMUPath))
+		{
+			/* We want the original path here, not a HTML-escaped version. */
+			$sQEMUPath = "<emulator>{$sVPS->sServer->uQEMUPath}</emulator>";
+		}
+		
+		/* FIXME: This can be done nicer. */
+		switch($sVPS->uDiskDriver)
+		{
+			case "scsi":
+			case "virtio":
+			case "ide":
+				$sTargetDevice = "<target dev='hda' bus='{$sVPS->uDiskDriver}'/>";
+				break;
+			default:
+				$sTargetDevice = "<target dev='hda' bus='ide'/>";
+				break;
+		}
+		
+		if($sVPS->sSecondaryDrive !== "") /* FIXME: CPHP issue #3 */
+		{
+			$sSecondaryDrive = "
+			<disk type='file' device='disk'>
+				<source file='{$sVPS->sSecondaryDrive}'/>
+				{$sTargetDevice}
+			</disk>";
+		}
+		
+		try {
+			$sTemplateSource = "<source file='/var/feathur/data/templates/kvm/{$sVPS->sTemplate->uPath}.iso'/>";
+		} catch (NotFoundException $e) { $sTemplateSource = ""; /* No valid template is configured. TODO: Log warning? This might also be triggered by a 'None' selection. */ }
+		
+		/* Set up network devices */
+		$sNetworkDevices = array();
+		
+		/* FIXME: This can be done nicer. */
+		switch($sVPS->uNetworkDriver)
+		{
+			case "rt18139":
+			case "e1000":
+			case "virtio":
+			case "ne2k_pci":
+			case "pcnet":
+				$sNetworkModel = "<model type='{$sVPS->uNetworkDriver}'/>";
+				break;
+			default:
+				$sNetworkModel = "<model type='e1000'/>";
+				break;
+		}
+		
+		$sMacList = explode(",", $sVPS->uMac);
+		
+		if(count($sAssignedIps) > 0)
+		{
+			for($i = 0; $i < count($sAssignedIps); $i++)
+			{
+				$sNetworkDevices[] = "<interface type='bridge'><source bridge='br0'/><target dev='kvm{$sVPS->sContainerId}.{$i}'/><mac address='{$sMacList[$i]}'/><model type='{$sNetworkModel}' /></interface>";
+			}
+		}
+		
+		if($sVPS->sPrivateNetwork == 1)
+		{
+			if(count($sMacList) < (count($sAssignedIps) + 1))
+			{
+				/* Generate an additional MAC. */
+				$sMacList[] = generate_mac();
+				$sVPS->uMac = implode(",", $sMacList);
+				$sVPS->InsertIntoDatabase();
+			}
+			
+			/* Since there's only one private interface, we should be able to safely
+			 * pick the last MAC; it should always be unoccupied. */
+			$sInterfaceNumber = count($sAssignedIps); /* Don't need to add 1, because zero-based. */
+			$sMac = end($sMacList);
+			$sNetworkDevices[] = "<interface type='bridge'><source bridge='pb{$sVPS->sUserId}'/><target dev='kvm{$sVPS->sContainerId}.{$sInterfaceNumber}'/><mac address='{$sMac}'/><model type='{$sNetworkModel}' /></interface>";
+			$sPrivateNetworkCommands = "brctl addbr pb{$sVPS->sUserId}; brctl addif pb{$sVPS->sUserId} kvm{$sVPS->sContainerId}.{$sInterfaceNumber}";
+		}
+		
+		$sNetworkDeviceString = implode("", $sNetworkDevices);
+		$sVncPassword = escapeshellarg($sPassword);
+		
+		$sXmlConfig = escapeshellarg("
+			<domain type='kvm'>
+				<name>kvm{$sVPS->sContainerId}</name>
+				<memory>{$sMemory}</memory>
+				<currentMemory>{$sMemory}</currentMemory>
+				<memtune>
+					<hard_limit>{$sMemoryLimit}</hard_limit>
+				</memtune>
+				<vcpu>{$sCPUs}</vcpu>
+				<cpu>
+					<topology sockets='1' cores='{$sCPUs}' threads='1'/>
+				</cpu>
+				<os>
+					<type machine='pc'>hvm</type>
+					<boot dev='{$sVPS->uBootOrder}'/>
+				</os>
+				<clock sync='localtime'/>
+				<devices>
+					{$sQEMUPath}
+					<disk type='file' device='disk'>
+						<source file='/dev/{$sVPS->Server->sVolumeGroup}/kvm{$sVPS->sServer->sContainerId}_img'/>
+						{$sTargetDevice}
+					</disk>
+					{$sSecondaryDrive}
+					<disk type='file' device='cdrom'>
+						{$sTemplateSource}
+						<target dev='hdc'/>
+						<readonly/>
+					</disk>
+					{$sNetworkDeviceString}
+					<graphics type='vnc' port='{$sVPS->sVNCPort}' passwd={$sVncPassword} listen='0.0.0.0'/>
+					<input type='tablet'/>
+					<input type='mouse'/>
+				</devices>
+				<features>
+					<acpi/>
+					<apic/>
+				</features>
+			</domain>
+		");
+		
+		/* FIXME: This does not allow for IPs in different ranges? */
+		$sDhcpConfig = escapeshellarg("
+			host kvm{$sVPS->sContainerId}.0
+			{
+				hardware ethernet {$sVPS->sMac};
+				option routers {$sAssignedIps[0]->sBlock->sGateway};
+				option subnet-mask {$sAssignedIps[0]->sBlock->sNetmask};
+				fixed-address {$sAssignedIps[0]->sIPAddress};
+				option domain-name-servers {$sVPS->sNameserver};
+			}
+		");
+		
+		$sHead = escapeshellarg(file_get_contents('/var/feathur/feathur/includes/configs/dhcp.head'));
+		
+		/* Regenerate configuration files for libvirt and DHCP. */
+		$sCommands[] = "mkdir /var/feathur/";
+		$sCommands[] = "mkdir /var/feathur/configs/";
+		$sCommands[] = "echo {$sXmlConfig} > /var/feathur/configs/kvm{$sVPS->sContainerId}-vps.xml";
+		$sCommands[] = "echo {$sHead} > /var/feathur/configs/dhcp.head";
+		$sCommands[] = "echo {$sDhcpConfig} > /var/feathur/configs/kvm{$sVPS->sContainerId}-dhcp.conf";
+		$sCommands[] = "cat /var/feathur/configs/dhcpd.head /var/feathur/configs/*-dhcp.conf > /etc/dhcp/dhcpd.conf";
+		$sCommands[] = "service isc-dhcp-server restart";
+		
+		if(!empty($sPrivateNetworkCommands))
+		{
+			$sCommands[] = $sPrivateNetworkCommands;
+		}
+		
+		if($sDiskChanged === true)
+		{
+			$sCommands[] = "lvextend --size {$sVPS->sDisk}G /dev/{$sVPS->sServer->sVolumeGroup}/kvm{$sVPS->sContainerId}_img;";
+		}
+		
+		$sCommandString = implode("; ", $sCommands);
+		$sResult = $sSSH->exec($sCommandString);
+		VPS::save_vps_logs(array(
+			"command" => str_replace($sVncPassword, "<obfuscated>", $sCommandString),
+			"result" => $sResult
+		), $sVPS);
+	}
+	
 	public function kvm_config($sUser, $sVPS, $sRequested, $sPassword = 0){
+		/* DEPRECATED; use configure() instead. This is just a compatibility shim. */
 		$sCheck = $this->kvm_check_suspended($sVPS);
 		if($sCheck == true){
 			echo json_encode(array("result" => "This VPS is Suspended!", "type" => "success", "json" => 1));
 			die();
 		}
 		
-		$sServer = new Server($sVPS->sServerId);
-		$sSSH = Server::server_connect($sServer);
-		$sIPList = VPS::list_ipspace($sVPS);
-		$sMemory = ($sVPS->sRAM * 1024);
-		$sHardLimit = ($sMemory + 51200);
-		$sCPUs = $sVPS->sCPULimit;
-		
-		$sTemplateId = $sVPS->sTemplateId;
-		if(!empty($sTemplateId)){	
-			try {
-				$sTemplate = new Template($sVPS->sTemplateId);
-			} catch (Exception $e) {
-				$sVPS->uTemplate = 0;
-				$sVPS->InsertIntoDatabase();
-			}
-		}
-		
-		$sQEMUPath = $sServer->sQEMUPath;
-		if(!empty($sQEMUPath)){
-			$sQEMUPath = "<emulator>{$sQEMUPath}</emulator>";
-		}
-			
-		$sVPSConfig .= "<domain type='kvm'>";
-		$sVPSConfig .= "<name>kvm{$sVPS->sContainerId}</name>";
-		$sVPSConfig .= "<memory>{$sMemory}</memory>";
-		$sVPSConfig .= "<currentMemory>{$sMemory}</currentMemory>";
-		$sVPSConfig .= "<memtune><hard_limit>{$sHardLimit}</hard_limit></memtune>";
-		$sVPSConfig .= "<vcpu>{$sCPUs}</vcpu>";
-		$sVPSConfig .= "<cpu><topology sockets='1' cores='{$sCPUs}' threads='1'/></cpu>";
-		$sVPSConfig .= "<os><type machine='pc'>hvm</type><boot dev='{$sVPS->sBootOrder}'/></os>";
-		$sVPSConfig .= "<clock sync='localtime'/>";
-		
-		$sDiskDriver = $sVPS->sDiskDriver;
-		if((empty($sDiskDriver)) || ($sDiskDriver == 'ide')){
-			$sTarget = "<target dev='hda' bus='ide'/>";
-		} elseif($sDiskDriver == 'scsi'){
-			$sTarget = "<target dev='sdg' bus='scsi'/>";
-		} elseif($sDiskDriver == 'virtio'){
-			$sTarget = "<target dev='vda' bus='virtio'/>";
-		} else {
-			$sTarget = "<target dev='hda' bus='ide'/>";
-		}
-		
-		if(isset($sVPS->sSecondaryDrive)){
-			$sSecondary = "<disk type='file' device='disk'><source file='{$sVPS->sSecondaryDrive}'/>{$sTarget}</disk>";
-		}
-		
-		$sVPSConfig .= "<devices>{$sQEMUPath}<disk type='file' device='disk'><source file='/dev/{$sServer->sVolumeGroup}/kvm{$sVPS->sContainerId}_img'/>{$sTarget}</disk>{$sSecondary}<disk type='file' device='cdrom'>";
-			
-		if(isset($sTemplate)){
-			$sVPSConfig .= "<source file='/var/feathur/data/templates/kvm/{$sTemplate->sPath}.iso'/>";
-		}
-			
-		$sVPSConfig .= "<target dev='hdc'/><readonly/></disk>";
-		
-		$sNetworkDriver = $sVPS->sNetworkDriver;
-		if(empty($sNetworkDriver)){
-			$sVPS->uNetworkDriver = "e1000";
-			$sVPS->InsertIntoDatabase();
-		}
-		
-		$sIPCount = count($sIPList);
-		$sMacList = explode(",", $sVPS->sMac);
-		$sCurrent = 0;
-		if($sIPCount >= 1){
-			foreach($sIPList as $sKey => $sValue){
-				$sVPSConfig .= "<interface type='bridge'><source bridge='br0'/><target dev='kvm{$sVPS->sContainerId}.{$sCurrent}'/><mac address='{$sMacList[$sCurrent]}'/><model type='{$sVPS->sNetworkDriver}' /></interface>";
-				$sCurrent++;
-			}
-		}
-		
-		$sPrivateNetwork = $sVPS->sPrivateNetwork;
-		if($sPrivateNetwork == 1){
-			if(empty($sMacList[$sCurrent])){
-				$sMac = $sVPS->sMac;
-				$sNewMac = generate_mac();
-				$sVPS->uMac = $sMac.','.$sNewMac;
-				$sVPS->InsertIntoDatabase();
-				$sMac = $sNewMac;
-			} else {
-				$sMac = $sMacList[$sCurrent];
-			}
-			$sVPSConfig .= "<interface type='bridge'><source bridge='pb{$sVPS->sUserId}'/><target dev='kvm{$sVPS->sContainerId}.{$sCurrent}'/><mac address='{$sMac}'/><model type='{$sVPS->sNetworkDriver}' /></interface>";
-			$sPrivateNetworkCommands = "brctl addbr pb{$sVPS->sUserId}; brctl addif pb{$sVPS->sUserId} kvm{$sVPS->sContainerId}.{$sCurrent};";
-		}
-		
-		if(empty($sPassword)){
-			$sVPSConfig .= "<graphics type='vnc' port='{$sVPS->sVNCPort}' passwd='' listen='127.0.0.1'/>";
-		} else {
-			$sPassword = escapeshellarg($sPassword);
-			$sVPSConfig .= "<graphics type='vnc' port='{$sVPS->sVNCPort}' passwd={$sPassword} listen='0.0.0.0'/>";
-		}
-		$sVPSConfig .= "<input type='tablet'/><input type='mouse'/></devices><features><acpi/><apic/></features></domain>";
-		$sVPSConfig = escapeshellarg($sVPSConfig);
-			
-		$sBlock = new Block($sIPList[0]["block"]);
-		$sDHCP .= "host kvm{$sVPS->sContainerId}.0 { hardware ethernet {$sVPS->sMac}; option routers {$sBlock->sGateway}; option subnet-mask {$sBlock->sNetmask}; fixed-address {$sIPList[0]["ip"]}; option domain-name-servers {$sVPS->sNameserver}; }";
-		$sDHCP = escapeshellarg($sDHCP);
-		
-		$sHead = escapeshellarg(file_get_contents('/var/feathur/feathur/includes/configs/dhcp.head'));
-		$sCommandList .= "mkdir /var/feathur/;mkdir /var/feathur/configs/;echo {$sVPSConfig} > /var/feathur/configs/kvm{$sVPS->sContainerId}-vps.xml; echo {$sHead} > /var/feathur/configs/dhcp.head;echo {$sDHCP} > /var/feathur/configs/kvm{$sVPS->sContainerId}-dhcp.conf;cat /var/feathur/configs/dhcpd.head /var/feathur/configs/*-dhcp.conf > /etc/dhcp/dhcpd.conf;service isc-dhcp-server restart;{$sPrivateNetworkCommands}";
-		
-		if($sRequested["GET"]["diskchanged"] == 1){
-			$sCommandList .= "lvextend --size {$sVPS->sDisk}G /dev/{$sServer->sVolumeGroup}/kvm{$sVPS->sContainerId}_img;";
-		}
-			
-		$sLog[] = array("command" => str_replace($sPassword, "obfuscated", $sCommandList), "result" => $sSSH->exec($sCommandList));
-		$sSave = VPS::save_vps_logs($sLog, $sVPS);
+		$sPassword = ($sPassword == 0) ? "" : $sPassword;
+		$sDiskChanged = !empty($sRequested["GET"]["diskchanged"]);
+		$sAssignedIps = IP::CreateFromQuery("SELECT * FROM ipaddresses WHERE `vps_id` = :VpsId", array("VpsId" => $sVPS->sId));
+		$this->configure($sVPS, $sAssignedIps, $sDiskChanged, $sPassword);
 	}
 	
 	public function database_kvm_bootorder($sUser, $sVPS, $sRequested){

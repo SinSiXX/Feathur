@@ -48,6 +48,12 @@ class VPS extends CPHPDatabaseRecordClass {
 		),
 		"user" => array(
 			"User" => "user_id"
+		),
+		"server" => array(
+			"Server" => "server_id"
+		),
+		"template" => array(
+			"Template" => "template_id"
 		)
 	);
 	
