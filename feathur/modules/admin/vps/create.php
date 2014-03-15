@@ -217,7 +217,6 @@ if($router->uMethod == "post")
 			
 			$sVPS = new VPS();
 			$sVPS->uType = $handler->GetValue("virt_type");
-			$sVPS->uHostname = $uHostname;
 			$sVPS->uUserId = $sOwner->sId;
 			$sVPS->uServerId = $sServer->sId;
 			$sVPS->uRAM = $handler->GetValue("ram");
