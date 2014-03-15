@@ -86,6 +86,11 @@ function ValidateKvmTemplate($key, $value, $args, $handler){
 	}
 }
 
+function ValidateHostname($key, $value, $args, $handler)
+{
+	return (preg_match("/^[a-z0-9.-]*$/i", $value) === 1); /* FIXME: Move this to CPHP FormValidator code as standard validator. */
+}
+
 /* Actual module code starts here. */
 
 if($router->uMethod == "post")
@@ -141,6 +146,7 @@ if($router->uMethod == "post")
 				->ValidateNumeric("ram")
 				->ValidateNumeric("bandwidthlimit")
 				->ValidateNumeric("ipaddresses")
+				->ValidateCustom("hostname", "The specified hostname is not valid.", "ValidateHostname")
 				->Switch_("virt_type", "",  /* TODO: Filter out empty error messages */
 					/* Either OpenVZ options must be filled in... */
 					$handler->Case_("openvz",
